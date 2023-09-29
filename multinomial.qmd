@@ -1,0 +1,811 @@
+---
+documentclass: article
+format: pdf
+editor: visual
+header-includes:
+- \usepackage[utf8]{inputenc} #para usar accentos
+# Formato de titulo de capitulo
+# Options: Sonny, Lenny, Glenn, Conny, Rejne, Bjarne, Bjornstrup
+- \usepackage[Lenny]{fncychap}
+- \usepackage{multirow}
+- \usepackage{float}
+- \usepackage[bottom=3.5cm, top=2cm, left=1in, right=1in]{geometry}
+- \usepackage{setspace}
+- \usepackage{fancyhdr}
+- \pagestyle{fancy}
+#- \pagestyle{headings}
+#- \pagestyle{empty}
+- \usepackage{makeidx}
+- \usepackage{graphicx}
+- \usepackage{wrapfig}
+- \usepackage{enumerate}
+#- \renewcommand{\headrulewidth}{3pt}
+- \renewcommand{\baselinestretch}{1.5}
+- \renewcommand{\headrulewidth}{0.0001cm}
+- \renewcommand{\theenumi}{\arabic{enumi}}
+lang: es-ES
+---
+
+```{=tex}
+\thispagestyle{empty}
+\begin{center}\textbf{UNIVERSIDAD DE EL SALVADOR} \end{center}
+\begin{center}\textbf{FACULTAD MULTIDISCIPLINARIA DE OCCIDENTE} \end{center}
+\begin{center}\textbf{DEPARTAMENTO DE MATEMATICAS} \end{center}
+\begin{center}\includegraphics[width=0.3\textwidth]{251.png} \end{center}
+\begin{center} \textbf{REGRESIÓN LOGÍSTICA MULTINOMIAL} \end{center}
+\vspace{0.5cm}
+\begin{center}\textbf{CARRERA:} \end{center}
+\begin{center}\textbf{LICENCIATURA EN ESTADÍSTICA.} \end{center}
+\vspace{0.5cm}
+\begin{center}\textbf{ASIGNATURA:} \end{center}
+\begin{center}\textbf{PROYECTOS DE ESTUDIOS ESTADÍSTICOS} \end{center}
+\vspace{0.5cm}
+\begin{center}\textbf{DOCENTE:} \end{center}
+\begin{center}\textbf{LICDO. JAIME ISAAC PEÑA MEJIA} \end{center}
+\vspace{0.5cm}
+\begin{center}\textbf{PRESENTADO POR:} \end{center}
+\begin{center}\textbf{NAHUN ANTONIO MARTÍNEZ OLMOS (MO19005)} \end{center}
+\vspace{0.5cm}
+\begin{center}\textbf{FECHA:} \end{center}
+\begin{center}\textbf{25 DE SEPTIEMBRE DE 2023} \end{center}
+```
+
+
+\tableofcontents
+
+\newpage
+
+\setcounter{page}{3}
+\section{Introducción}
+
+La regresión logística multinomial es una generalización de la regresión logística binaria, ya que tienen la misma lógica y el mismo fin, con la diferencia de que en la regresión logística multinomial las alternativas en la variable dependiente metrica son al menos 3. Esta técnica se clasifica en las técnicas de dependencia debido a que se identifica de manera clara cuál es la variable dependiente cuando se tiene una situación donde sea aplicable, y muchas veces suele confundirse con el análisis discriminante, ya que en ambas técnicas se tienen los grupos estimados en los cuales se clasificarán las nuevas observaciones, pero la regresión logística multinomial, a diferencia del análisis discriminante no es muy rigorosa con supuestos de normalidad multivariante u otras características en donde el análisis discriminante si lo es. En esta ocasión el problema que se tiene es estimar un modelo de regresión logística multinomial con el fin de predecir el origen geográfico de automóviles, con base a su potencia, aceleración, peso y número de cilindros, y se realizarán análisis descriptivos para evaluar la relación entre la variable dependiente y las variables independientes, así como también se evaluará la capacidad predictiva del modelo, y se realizarán unas predicciones a nuevas observaciones, o en este caso a nuevos automóviles, ya que uno de los objetivos de las técnicas predictivas es predecir con base a las variables explicativas o independientes.
+
+\section{1. Regresión Logística Multinomial en Python}
+
+A continuación, se importarán en python, todas las librerías necesarias para realizar el análisis.
+
+```{python}
+import seaborn as sns
+import numpy as np
+import pandas as pd
+from sklearn.linear_model import LogisticRegression
+from sklearn.model_selection import train_test_split
+from sklearn import preprocessing
+from sklearn.metrics import accuracy_score
+from sklearn.model_selection import cross_val_score
+from sklearn.metrics import confusion_matrix
+import matplotlib as mpl
+import matplotlib.pyplot as plt
+import statsmodels.api as sm
+```
+
+\subsection{1.1. Análisis exploratorio}
+
+Siempre antes de tener la intuición de que se puede llevar a cabo la aplicación de una tecnica multivariante a una determinada situación o fenomeno es muy importante realizar analisis explorios a los datos con los que se trabajará, para que de esa manera podamos tener una fuerte base al momento de decidir si vale la pena aplicar la tecnica multivariante o no, debido a que en el análisis exploratorio y descriptivo nos daremos cuenta como están nuestros datos y si cumplen con ciertos criterios dependiendo del modelo estadístico que se decee estimar, en este caso es un modelo elección multiple el que se decea estimar pero antes de decidir hacerlo o no veremos si las variables independientes perecen tener una influencia significativa sobre la variable dependiente no metrica del modelo que se pretenderá ajustar.
+
+Ahora se importará la base de datos que contiene las variables necesarias para realizar el ajuste del modelo de elección múltiple, también se observará cuáles son las variables que contiene la base de datos y cuantos registros tiene.
+
+```{python}
+carros = pd.read_spss('Coches.sav') #importando la base de datos
+carros.shape #dimensiones de la de la base de datos
+```
+
+Como podemos observar en el resultado anterior, la base de datos contiene $406$ registros y $9$ variables, de las cuales se muestra su descripción a continuación.
+
+```{python}
+carros.dtypes
+```
+
+Podemos observar, se cuenta con las variables métricas consumo, motor, potencia (cv), peso, aceleración (acel) y año, mientras que las variables no métricas con las que se cuenta son origen, número de cilindros que tienen (cilind) y si el auto fue seleccionado o no. La variable explicada será origen, las variables explicativas, métricas que se utilizarán son peso, aceleración y potencia, mientras que como factor se decidirá si se utilizará la variable cilindr o derivada, cuya decisión se basará en los resultados descriptivos que se obtengan.
+
+Ahora se creará un sub Data Frame con las variables que se usarán.
+
+```{python}
+autos=carros[['cv','peso','acel','origen','cilindr','derivada']]
+```
+
+\subsubsection{1.1.1. Gestión de valores nulos}
+
+A continuación, se mostrará de manera gráfica si las variables que estamos estudiando contienen valores nulos.
+
+```{python}
+sns.heatmap(autos.isnull(), cbar=False)
+```
+
+Como se puede verificar al observar la figura anterior, solamente en las variables peso y aceleración no se cuenta con valores nulos, lo que significa que se imputarán los valores nulos en las restantes $4$ variables. A continuación los imputaremos en las variables discretas, sustituyendo los valores perdidos por la moda.
+
+```{python}
+autos['origen'].fillna(autos['origen'].mode()[0], inplace=True)
+autos['cilindr'].fillna(autos['cilindr'].mode()[0], inplace=True)
+autos['derivada'].fillna(autos['derivada'].mode()[0], inplace=True)
+```
+
+Ahora imputaremos los valores perdidos de la variable potencia mediante el modelo predictivo KNN.
+
+```{python}
+from sklearn.impute import KNNImputer
+
+# Construimos el modelo
+imputer = KNNImputer(n_neighbors=5, weights='uniform')
+
+#Ajustamos el modelo e imputamos los missing values de la variable potencia
+imputer.fit(autos[['cv']])
+autos['cv'] = imputer.transform(autos[['cv']]).ravel()
+```
+
+por último se comprobará que ya no existen valores nulos en ningunas de las variables a utilizar.
+
+```{python}
+#Suma de valores nulos en cada variable
+autos.isnull().sum()
+```
+
+Debido a que se desea ajustar un modelo de elección múltiple para explicar la relación entre el origen geográfico de los automóviles con las variables independientes o para predecir el origen de los automóviles mediante las variables independientes (potencia, número de cilindros, aceleración, peso y derivada)
+
+\subsubsection{1.1.2. Análisis descriptivo}
+
+Para poder determinar cuáles variables independientes valen la pena agregar a nuestro modelo de elección múltiple se analizará de manera bi variada la relación entre la variable dependiente (origen) con las variables independientes, mediante tablas de contingencia se analizará la relación entre la variable dependiente (origen) y las variables no métricas (número de cilindros y derivada) y mediante gráficos de cajas se analizará la relación entre las variables independientes métricas (peso, aceleración y potencia) y la variable dependiente origen, y estos gráficos se harán por categorías de la variable origen. A continuación empezaremos analizando la relación entre la variable origen y la variable número de cilindros.
+
+```{python}
+data_crosstab = pd.crosstab(autos['origen'], autos['cilindr'], margins = True)
+print(data_crosstab)
+```
+
+Como podemos observar en la tabla anterior, parece ser que los automóviles de 4 cilindros son de los que se tienen cantidades más o menos similares en cada una de las 3 posibles regiones de origen (Estados Unidos, Europa o Japón), y que sí, un automóvil es de 8 cilindros prácticamente es seguro que su origen sea Estados unidos; sin embargo, los automóviles de Estados Unidos parece ser que se distribuyen de manera uniforme en cuanto a los que son de 4 y 6 cilindros. En conclusión, se nota que esta variable puede aportarnos mucha información para el modelo logístico que se desea estimar, por lo que esta variable será incluida como variable explicativa. Ahora se analizará la relación entre la variable origen y la variable derivada (Filtro).
+
+```{python}
+data_crosstab = pd.crosstab(autos['origen'], autos['derivada'], margins = True)
+print(data_crosstab)
+```
+
+Como podemos observar en el resultado anterior, parece ser que los automóviles de origen Europa y Japón son seleccionados prácticamente el 100% mientras que los de origen en Estados unidos son seleccionados aproximadamente el 50% (esto puede restar potencialidad a la capacidad predictiva del modelo), es por esta razón que la variable filtro (derivada) se considera que no vale la pena incluirla en nuestro modelo.
+
+A continuación seguiremos con el análisis de la variable potencia, ya que es una variable métrica, en la cual se analizará que tanto varían las potencias de los automóviles con respecto a los orígenes de los mismos, estas diferencias se muestran en la siguiente figura.
+
+```{python}
+#import seaborn as sns
+
+# Box plot por grupo
+sns.boxplot(x = autos['origen'], y = autos['cv'], palette = "Set3") 
+
+```
+
+Como podemos observar en la figura anterior, parece ser que las potencias medias de los vehículos con respecto a su origen varían, aunque la mayor diferencia se observa con los automóviles de Estados Unidos, los cuales difieren y varían más con respecto a los de Europa y Japón, que es poco lo que difieren y varían entre ellos, por esta razón se ha decidido tomar en cuenta esta variable como variable explicativa.
+
+Ahora se analizará si vale la pena incluir la variable aceleración como variable explicativa en nuestro modelo de respuesta cualitativa, esto se analizará de la misma manera que con la variable potencia. A continuación se muestra el respectivo gráfico de la aceleración con respecto a su origen.
+
+```{python}
+sns.boxplot(x = autos['origen'], y = autos['acel'], palette = "Set3")
+```
+
+Como podemos observar en la figura anterior, se observa que la diferencia en la aceleración medio de los automóviles con origen en Europa difiere aproximadamente igual con los de origen en Japón y Estados Unidos, y la diferencia entre la aceleración media es más grande entre Japón y Estados unidos que las anteriormente mencionadas, también cabe mencionar que en Europa es donde se da la aceleración promedio más alta en los automóviles, debido a estas diferencias descritas se decide por tomar en cuenta la variable aceleración para nuestro modelo de respuesta múltiple.
+
+Ahora analizaremos la discriminación del origen con respecto al peso de los vehículos, para realizar este análisis se muestra a continuación, un boxplot del peso de los automóviles con respecto a su origen.
+
+```{python}
+sns.boxplot(x = autos['origen'], y = autos['peso'])
+```
+
+Como podemos observar en la figura anterior, los pesos medios difieren con respecto a su origen, es decir, el origen de los automóviles tiene influencia en su peso, si miramos los gráficos de Estados Unidos y Japón ni siquiera se traslapan, por ello se decide que si vale la pena agregar la variable peso a nuestro modelo de respuesta múltiple.
+
+\subsection{1.2. Regresión logística multinomial con scikit-learn}
+
+A continuación, se pasarán las variables independientes categóricas a variables dummies (esto es esencial para el ajuste del modelo).
+
+```{python}
+cilindro = pd.get_dummies(carros["cilindr"])
+```
+
+\subsubsection{1.2.1. Estimación del modelo de elección discreta}
+
+A continuación se estimará el modelo de regresión logística con origen como la variable dependiente y con las variables peso, aceleración, potencia, cilindros y filtro (derivada) como independientes, y se dividirá el conjunto de datos en una parte de entrenamiento y una de prueba.
+
+```{python}
+automoviles=pd.read_csv('automoviles.csv')
+
+x = automoviles.drop(['origen','derivada','cilindr'], axis=1)
+x = pd.concat([x,cilindro], axis=1)
+
+
+#x['cilindr']=pd.Categorical(x['cilindr'])
+
+#x['Seleccionado']=pd.Float64Dtype(x['Seleccionado'])
+
+
+y = automoviles['origen']
+trainX, testX, trainY, testY = train_test_split(x, y, test_size = 0.2)
+
+```
+
+A continuación se muestra el ajuste del modelo de regresión logística multinomial.
+
+```{python}
+log_reg = LogisticRegression(solver='newton-cg', multi_class='multinomial')
+log_reg.fit(trainX, trainY)
+y_pred = log_reg.predict(testX)
+```
+
+\subsubsection{1.2.2. Evaluación del ajuste del modelo}
+
+A continuación, se muestra la precisión y la tasa de error de nuestro modelo logístico.
+
+```{python}
+print('Accuracy: {:.2f}'.format(accuracy_score(testY, y_pred)))
+print('Error rate: {:.2f}'.format(1 - accuracy_score(testY, y_pred)))
+```
+
+Como podemos observar en el resultado anterior, nuestro modelo tiene una precisión aproximadamente del 70%, lo que significa que es buen ajuste el que se ha realizado.
+
+Ahora se mostrarán las puntuaciones de validación cruzada para nuestro modelo.
+
+```{python}
+clf = LogisticRegression(solver='newton-cg', multi_class='multinomial')
+scores = cross_val_score(clf, trainX, trainY, cv=5)
+scores
+```
+
+Como podemos observar, las puntuaciones de validación cruzada son altas para cada una de las variables explicativas, lo que da aún más solides a nuestro de modelo logístico multinomial.
+
+Uno de los mejores indicadores para evaluar el ajuste de un modelo logístico multinomial es la matriz de confusión, la cual nos muestra la cantidad total de predicciones acertadas de nuestro modelo logit, para ello se muestran la cantidad acertada para cada posible origen al que un automóvil puede pertenecer cuando se conoce su potencia, su peso, su aceleración, su número de cilindros y si pasó o no el filtro, por ello a continuación se muestra la matriz de confusión de nuestro modelo.
+
+```{python}
+confusion_matrix = confusion_matrix(testY, y_pred)
+print(confusion_matrix)
+```
+
+Como se puede observar, son muchos más los automóviles que se han clasificado de manera correcta por nuestro modelo que los que se han clasificado de manera correcta, esto muestra el poder predictivo de nuestro modelo. A continuación se mostrarán de manera gráfica la matriz los resultados de la matriz de confusión.
+
+```{python}
+plt.matshow(confusion_matrix, cmap=plt.cm.gray)
+plt.show()
+```
+
+Como se puede visualizar en la figura anterior, es para la clase 0 (Estados Unidos) que más se han acertado las predicciones realizadas por nuestro modelo, seguido por la clase 2 (Japón) y por último la clase 2 (Europa).
+
+En este caso, el modelo de regresión logística multinomial calcula la probabilidad de que un determinado automóvil pertenezca a un determinado origen, estas probabilidades son complementarias (suman 1), y al origen que el automóvil tenga más probabilidad de pertenecer es el destino predicho donde el automóvil se clasifica ya cuando hemos ingresado al modelo de respuesta cualitativa sus características que describen su perfil, a continuación se muestran 6 de estas probabilidades.
+
+```{python}
+probability = log_reg.predict_proba(testX)
+for i in range(6):
+  k=list(list(probability)[i])
+  mensaje='Probabilidad de pertenecer a uno de los 3 posibles orígenes' 
+  o1='Estados Unidos='+str(round(k[0],4))
+  o2,o3= '; Europa='+str(round(k[1],4)),'; Japón='+str(round(k[2],4))
+  print(mensaje+' (automovil '+str(i+1)+'):\n'+o1+o2+o3+'\n')
+  
+```
+
+Ahora mostraremos que la longitud de predicciones que se calcularon anteriormente (aunque solo se mostraron 6) es la misma que la longitud de los datos de prueba del modelo.
+
+```{python}
+print(probability.shape[0])
+print(testX.shape[0])
+```
+
+A continuación se muestran 10 casos en donde el modelo define cual es la clase predicha con base en las probabilidades.
+
+```{python}
+df = pd.DataFrame(log_reg.predict_proba(testX), columns=log_reg.classes_)
+df['predicted_class'] = y_pred
+print(df.head(10))
+```
+
+A continuación se mostrarán 10 casos en los cuales se observa cuál es el origen real y cuál es el origen predicho por el modelo logístico multinomial.
+
+```{python}
+df['actual_class'] = testY.to_frame().reset_index().drop(columns='index')
+print(df.head(10))
+```
+
+Como podemos observar en los $10$ resultados anteriores, el modelo ha acertado en $9$ de ellos.
+
+Ahora lo que se realizará es la comprobación de la plausibilidad de los orígenes predichos, es decir, si se predijeron correctamente, si el resultado de la resta fue $0$ (columna check), eso significará que el modelo ha realizado de manera correcta la predicción. A continuación se muestran los primeros $5$ resultados.
+
+```{python}
+le = preprocessing.LabelEncoder()
+df['label_pred'] = le.fit_transform(df['predicted_class'])
+df['label_actual'] = le.fit_transform(df['actual_class'])
+df['check'] = df['label_actual'] - df['label_pred']
+print(df.head())
+```
+
+A continuación, después de haber generado los valores mostrados anteriormente, los cuales indican el acierto o desacierto de las predicciones, se calculará de manera manual la precisión de nuestro modelo multinomial.
+
+```{python}
+
+df['correct_prediction?'] = np.where(df['check'] == 0, 'True', 'False')
+df = df.drop(['label_pred', 'label_actual', 'check'], axis=1)
+
+true_predictions = df[(df["correct_prediction?"] == 'True')].shape[0]
+false_predictions = df[(df["correct_prediction?"] == 'False')].shape[0]
+total = df["correct_prediction?"].shape[0]
+
+print('Precisión calculada manualmente:', round((true_predictions / total * 100),4))
+```
+
+Como podemos observar en el anterior resultado, la precisión que se ha calculado de manera manual es de aproximadamente $70$% lo que significa que el modelo tiene una buena capacidad predictiva y se espera que esa capacidad se proyecte para cuando se necesite predecir el origen geográfico de un determinado automóvil.
+
+```{python}
+wrong_pred = df[(df["correct_prediction?"] == 'False')]
+```
+
+\subsubsection{1.2.3. Interpretación de los coeficientes de regresión}
+
+```{python}
+x = automoviles.drop(['origen','derivada','cilindr'], axis=1)
+#x=pd.concat([x,filtro], axis=1)
+x=pd.concat([x,cilindro], axis=1)
+y = automoviles['origen']
+#x=x.astype(float)
+
+x = sm.add_constant(x, prepend = False)
+
+mnlogit_mod = sm.MNLogit(y, x)
+mnlogit_fit = mnlogit_mod.fit()
+
+print (mnlogit_fit.summary())
+```
+En el cuadro anterior podemos observar que el coeficiente de regresión del peso en los automóviles es significativo y negativo, lo que significa que un menor peso en un vehículo incrementa la probabilidad de que el automóvil sea de origen Europeo o Japonés con Respecto a ser de origen Americano, de esta manera se pueden interpretar tambien los demas coeficientes.
+
+\subsubsection{1.2.4. Predicciones}
+
+Debido a que la clase de referencia es Estados Unidos, las probabilidades de pertenecer al origen de Japón o Europa son con respecto a Estados Unidos, ya que en la sección anterior se obtuvieron los coeficientes de regresión, se muestran a continuación como se calcula la probabilidad de pertenecer a cada origen:
+
+pr(Europa)$=\frac{e^{0.0085\times cv-0.0014\times peso+0.0734\times acel-21.27\times 3cilindros+6.7\times 4cilindros+14.47\times 5cilindros+3.96\times 6cilindros-10.63\times 8cilindros-6.76}}{1+e^{0.0085\times cv-0.0014\times peso+0.0734\times acel-21.27\times 3cilindros+6.7\times 4cilindros+14.47\times 5cilindros+3.96\times 6cilindros-10.63\times 8cilindros-6.76}}$
+
+pr(Japón)$=\frac{e^{0.047\times cv-0.001\times peso+0.14\times acel+46.95\times 3cilindros-2.63\times 4cilindros-7.5\times 5cilindros-3\times 6cilindros-29.19\times 8cilindros+4.6}}{1+e^{0.047\times cv-0.001\times peso+0.14\times acel+46.95\times 3cilindros-2.63\times 4cilindros-7.5\times 5cilindros-3\times 6cilindros-29.19\times 8cilindros+4.6}}$
+
+pr(EE.UU.)$=1-pr(Europa)-pr(Japon)$
+
+Para poder generar predicciones, se creará una función en Python que nos de una predicción sobre cual es el origen geografico mas posible de un nuevo automovil, la función se muestra a continuación.
+
+```{python}
+from math import e
+
+def prediccion(cv,peso,acel,cilindro):
+  if cilindro == '8 cilindros':
+    expo= e**(cv*0.0085-0.0014*peso+0.0734*acel-10.6334-6.7601)
+    europa=expo/(1+expo)
+  elif cilindro == '6 cilindros':
+    expo= e**(cv*0.0085-0.0014*peso+0.0734*acel+3.9647-6.7601)
+    europa=expo/(1+expo)
+  elif cilindro == '5 cilindros':
+    expo= e**(cv*0.0085-0.0014*peso+0.0734*acel+14.4705-6.7601)
+    europa=expo/(1+expo)
+  elif cilindro == '4 cilindros':
+    expo= e**(cv*0.0085-0.0014*peso+0.0734*acel+6.7086-6.7601)
+    europa=expo/(1+expo)
+  else:
+    expo= e**(cv*0.0085-0.0014*peso+0.0734*acel-21.2687-6.7601)
+    europa=expo/(1+expo)
+
+#japón
+  if cilindro=='8 cilindros':
+    expo2=e**(cv*0.0465-0.0116*peso+0.1442*acel-29.1851+4.6018)
+    expo2=expo2/(1+expo2)
+  elif cilindro=='6 cilindros':
+    expo2=e**(cv*0.0465-0.0116*peso+0.1442*acel-3.0375+4.6018)
+    expo2=expo2/(1+expo2)
+  elif cilindro=='5 cilindros':
+    expo2=e**(cv*0.0465-0.0116*peso+0.1442*acel-7.4968+4.6018)
+    expo2=expo2/(1+expo2)
+  elif cilindro=='4 cilindros':
+    expo2=e**(cv*0.0465-0.0116*peso+0.1442*acel-2.6317+4.6018)
+    expo2=expo2/(1+expo2)
+  else:
+    expo2=e**(cv*0.0465-0.0116*peso+0.1442*acel+46.9528+4.6018)
+    expo2=expo2/(1+expo2)
+
+  eeuu=1-(expo+expo2)
+  
+  if eeuu>expo and eeuu>expo2:
+    return 'EE.UU.'
+  elif expo2>expo:
+    return 'Japón'
+  else:
+    return 'Europa'
+  
+print(prediccion(130,1168,12,'8 cilindros'))      
+  
+```
+Ahora se realizarán predicciones para los siguientes $5$ nuevos registros de automóviles:
+
+```{python}
+autos= ['Automovil 1','Automovil 2','Automovil 3','Automovil 4','Automovil 5']
+pot= [220,71,59,61,108]
+p= [1225,856,605,498,905]
+ac= [11,14,19,17,16]
+cil= ['8 cilindros','4 cilindros','4 cilindros','5 cilindros','6 cilindros']
+
+print(pd.DataFrame({'Auto':autos,'cv':pot,'peso':p,'aceleracion':ac,'cilindro':cil}))
+```
+
+A continuación, se muestra la clase predicha para cada uno de estos nuevos $5$ automóviles, la cual se ha predicho mediante el modelo de regresión logística multinomial estimado.
+
+```{python}
+pred=[]
+
+for i in range(len(autos)):
+  pred.append(prediccion(pot[i],p[i],ac[i],cil[i]))
+  
+print(pd.DataFrame({'Automóvil':autos,'Origen Predicho':pred}))
+
+```
+
+
+\section{2. Regresión Logística Multinomial en R}
+
+Se tiene interés en predecir el origen geográfico de automóviles tomando en cuenta su potencia, peso, aceleración, número de cilindros y si el automóvil fue seleccionado o no al pasar por un filtro, pero previo a realizar una estimación de un modelo de regresión logística multinomial con el origen geográfico como variable dependiente, se analizará que variables son las que en verdad tienen sentido que se toman en cuenta para la estimación del modelo.
+
+\subsection{2.1. Análisis exploratorio}
+
+Se importará la base de datos que contiene las variables necesarias para realizar el ajuste del modelo de elección múltiple, también se observará cuáles son las variables que contiene la base de datos y cuantos registros tiene.
+
+```{r}
+library(readxl)
+
+autos <- read_excel('automoviles.xlsx')
+str(autos)
+```
+
+\subsubsection{2.1.1. Gestión de valores nulos}
+
+A continuación, se mostrará si las variables que se utilizarán para la estimación del modelo logístico multinomial contienen valores nulos.
+
+```{r}
+sapply(autos, function(x) sum(is.na(x)))
+
+```
+
+Como podemos observar en el resultado anterior, las variables potencia, origen, cilindro y filtro contienen valores nulos.
+
+A continuación, se muestra como imputamos los valores perdidos de la variable potencia, mediante el método predictive mean machine, el cual es de los más polivalentes debido a que rellena los datos faltantes con valores presentes en el conjunto de datos y eso reduce el sesgo y la probabilidad de tener valores anómalos.
+
+```{r}
+library(mice)
+imputacion <- mice(autos, m=5, meth = 'pmm', seed = 13)
+autos<- complete(imputacion, 1)
+
+```
+
+Ahora se muestra como se imputan por la moda los valores faltantes en las variables cualitativas que poseen ese tipo de valores.
+
+```{r}
+getmode <- function(v) {
+  uniqv <- unique(v)
+  uniqv[which.max(tabulate(match(v, uniqv)))]
+}
+
+autos$filtro<-ifelse(is.na(autos$filtro),getmode(autos$filtro),autos$filtro)
+autos$origen<-ifelse(is.na(autos$origen),getmode(autos$origen),autos$origen)
+autos$cilindro<-ifelse(is.na(autos$cilindro),getmode(autos$cilindro),
+                       autos$cilindro)
+```
+
+\subsubsection{2.1.2. Análisis descriptivo}
+
+Previo a la estimación del modelo de elección múltiple, es muy importante realizar un análisis descriptivo bivariado que nos permita tener una intuición de la relación que puede tener la variable origen con las variables independientes.
+
+A continuación empezaremos analizando la relación entre la variable origen y la variable número de cilindros.
+
+```{r}
+library('gmodels')
+attach(autos)
+CrossTable(origen,cilindro,prop.chisq=FALSE,prop.c=FALSE,prop.r=FALSE)
+```
+
+Como podemos observar en la tabla anterior, parece ser que los automóviles de 4 cilindros son de los que se tienen cantidades más o menos similares en cada una de las 3 posibles regiones de origen (Estados Unidos, Europa o Japón), y que sí, un automóvil es de 8 cilindros prácticamente es seguro que su origen sea Estados unidos; sin embargo, los automóviles de Estados Unidos parece ser que se distribuyen de manera uniforme en cuanto a los que son de 4 y 6 cilindros. En conclusión, se nota que esta variable puede aportarnos mucha información para el modelo logístico que se desea estimar, por lo que esta variable será incluida como variable explicativa. Ahora se analizará la relación entre la variable origen y la variable derivada (Filtro).
+
+```{r}
+CrossTable(origen,filtro,prop.chisq=FALSE,prop.c=FALSE,prop.r=FALSE)
+```
+
+Como podemos observar en el resultado anterior, parece ser que los automóviles de origen Europa y Japón son seleccionados prácticamente el 100% mientras que los de origen en Estados unidos son seleccionados aproximadamente el 50% (esto puede restar potencialidad a la capacidad predictiva del modelo), es por esta razón que la variable filtro (derivada) se considera que no vale la pena incluirla en nuestro modelo.
+
+A continuación seguiremos con el análisis de la variable potencia, ya que es una variable métrica, en la cual se analizará que tanto varían las potencias de los automóviles con respecto a los orígenes de los mismos, estas diferencias se muestran en la siguiente figura.
+
+```{r}
+boxplot(Potencia~origen, main='Potencia por región Origen', col='cadetblue4')
+```
+Como podemos observar en la figura anterior, parece ser que las potencias medias de los vehículos con respecto a su origen varían, aunque la mayor diferencia se observa con los automóviles de Estados Unidos, los cuales difieren y varían más con respecto a los de Europa y Japón, que es poco lo que difieren y varían entre ellos, por esta razón se ha decidido tomar en cuenta esta variable como variable explicativa.
+
+Ahora se analizará si vale la pena incluir la variable aceleración como variable explicativa en nuestro modelo de respuesta cualitativa, esto se analizará de la misma manera que con la variable potencia. A continuación se muestra el respectivo gráfico de la aceleración con respecto a su origen.
+
+```{r}
+boxplot(aceleracion~origen, main='Aceleración por región Origen', col='mediumturquoise')
+```
+Como podemos observar en la figura anterior, se observa que la diferencia en la aceleración medio de los automóviles con origen en Europa difiere aproximadamente igual con los de origen en Japón y Estados Unidos, y la diferencia entre la aceleración media es más grande entre Japón y Estados unidos que las anteriormente mencionadas, también cabe mencionar que en Europa es donde se da la aceleración promedio más alta en los automóviles, debido a estas diferencias descritas se decide por tomar en cuenta la variable aceleración para nuestro modelo de respuesta múltiple.
+
+Ahora analizaremos la discriminación del origen con respecto al peso de los vehículos, para realizar este análisis se muestra a continuación, un boxplot del peso de los automóviles con respecto a su origen.
+
+```{r}
+boxplot(peso~origen, main='Peso por región Origen', col='olivedrab1')
+```
+Como podemos observar en la figura anterior, los pesos medios difieren con respecto a su origen, es decir, el origen de los automóviles tiene influencia en su peso, si miramos los gráficos de Estados Unidos y Japón ni siquiera se traslapan, por ello se decide que si vale la pena agregar la variable peso a nuestro modelo de respuesta múltiple.
+
+\subsection{2.2. Estimación del modelo de elección múltiple}
+
+A continuación se cargan todos los paquetes necesarios para la estimación del modelo de elección múltiple.
+
+```{r}
+library(foreign)
+library(nnet)
+library(stargazer)
+library(ggplot2)
+library(gmodels)
+library(stargazer)
+```
+
+Para estimar el modelo se muestra a continuación un vistazo a los primeros $6$ registros de la base de datos que contiene las variables.
+
+```{r}
+head(autos)
+```
+
+Ahora se mostrarán los niveles de o categorías de las variables no métricas que se utilizarán para realizar la estimación del modelo de elección discreta.
+
+```{r}
+#Origenes posible
+unique(autos$origen)
+
+#posibles números de cilindro
+unique(autos$cilindro)
+```
+
+Como podemos observar, hay 3 orígenes posible y 5 posibles números de cilindros.
+
+Después de haber intuido la relación entre la variable dependiente y las independientes, nos encontramos en condición de estimar el modelo logístico multinomial, en el cual se tomará a Japón como el origen geográfico de referencia respecto al cual se va a interpretar los coeficientes de los otros dos factores.
+
+```{r}
+library(stats)
+autos$origen <- as.factor(autos$origen)
+autos$origen2<- relevel(autos$origen, ref = "EE.UU.")
+
+```
+
+A continuación se muestra la estimación del modelo logístico multinomial en R.
+
+```{r}
+multinomial <- multinom(origen2 ~ Potencia + peso + aceleracion + cilindro,
+data=autos)
+
+summary(multinomial)
+```
+
+Como podemos observar en el resultado anterior, ya se cuenta con la estimación del modelo logístico multinomial, en el que nos mostró cada estimación de los parámetros con su respectivo error estándar, también se cuenta con el valor de la función de máxima verosimilitud de los residuales multiplicada por -2, ahora mediante esta información que nos brinda la estimación del modelo se calculará la significatividad global del modelo y la significatividad individual para cada coeficiente, ya que estos cálculos son necesarios para la interpretación del modelo.
+
+\subsubsection{2.2.1. Contraste de hipótesis para el modelo estimado}
+
+Para poder calcular el ratio de verosimilitud se estimará el mismo modelo que se calculó anteriormente, pero solo con la constante, y se guardará la deviance del modelo estimado ($-2LL$) y se calculará la diferencia entre ambas, ya que está diferencia sigue una distribución $X^{2}$. A continuación se muestra la realización de estos cálculos.
+
+
+```{r}
+# Estimamos el modelo solo con la constante
+multi0 <- multinom(origen2 ~ 1, data=autos)
+
+# Calculamos el estadístico chi cuadrado como 
+# diferencia de sus -2LL (deviance)
+
+chi2<-multi0$deviance-multinomial$deviance
+df.chi2<-multinomial$edf-multi0$edf
+Sig.chi2<-1-pchisq(chi2,df.chi2)
+print(cbind(chi2,df.chi2,Sig.chi2))
+```
+
+Como podemos observar en el resultado anterior, el valor del estadístico de significatividad global es prácticamente cero, lo que significa que al menos un coeficiente está teniendo una influencia significativa para ayudar a predecir el origen geográfico de los automóviles, es por ello que se considera que las variables que se han determinado como independientes después del análisis descriptivo de los datos tienen peso al momento de tener influencia en el origen de los automóviles.
+
+Para calcular la significatividad individual de los parámetros, es suficiente con calcular la división entre los parámetros con su respectivo error estándar y se compara este resultado con el valor crítico de la distribución normal. Esto se realizará a continuación, mediante la función stargazer.
+
+```{r}
+stargazer(multinomial, type = "text")
+```
+
+Como podemos observar en el resultado anterior, prácticamente todas las variables aportan información para poder calcular la probabilidad de que un automóvil pertenezca a un determinado origen, y mediante esa probabilidad se realiza la predicción sobre a cuál de los 3 posibles orígenes es más plausible que pertenezca un determinado automóvil, es por esta razón que el modelo seguirá de la misma manera que sé ha estimado.
+
+\subsubsection{2.2.2. Interpretación de los coeficientes de regresión}
+
+En el cuadro anterior podemos observar que el coeficiente de regresión del peso en los automóviles es significativo y positivo, lo que significa que un mayor peso en un vehículo incrementa la probabilidad de que el automóvil sea de origen Europeo o Japonés con Respecto a ser de origen Americano.
+
+A continuación se calcularán los risk ratios, los cuales son un equivalente a los odd ratios que se estudian en la regresión logística binaria, esto con el fin de analizar e interpretar la contribución relativa de cada variable independiente.
+
+```{r}
+multi1.rrr = exp(coef(multinomial))
+
+stargazer(multinomial, type="text", coef=list(multi1.rrr), p.auto=FALSE)
+```
+
+Podemos observar que en el cuadro anterior, el mayor impacto sobre el origen geográfico de un automóvil, lo tiene el nivel de la variable cilindro, que corresponde a automóviles con $4$ cilindros, esto significa que es $0.62$ veces más probables que un país pertenezca a Europa o Japón con respecto a Estados Unidos (categoría de referencia).
+
+\subsubsection{2.2.3. Evaluación del ajuste del modelo}
+
+Para evaluar el ajuste del modelo, se calculará el $R^{2}$ de Mc Fadden el cual es intento de equivalencia con respecto al $R^2$ de la regresión lineal, este estadístico se construye como la diferencia entre la deviance del modelo constante y el modelo estimado entre la deviance del modelo constante, si el modelo estimado minimiza esa función de máxima verosimilitud es porque los coeficientes están teniendo una significativa influencia para predecir el origen geográfico de los automóviles, y la diferencia en el numerador será mínima si esto sucede, y entonces el valor del $R^{2}$ de Mc Fadden será mayor que cero, a continuación, para nuestro modelo de elección múltiple se muestra este cálculo descrito.
+
+```{r}
+R2MF<-(multi0$deviance-multinomial$deviance)/multi0$deviance;R2MF
+```
+
+Como podemos observar, el valor del $R^{2}$ de Mc Fadden es de $0.34$ aproximadamente, lo que significa que el modelo estimado ayuda a predecir con menos errores los orígenes geográficos de los automóviles.
+
+\subsubsection{2.2.4. Capacidad discriminante del modelo}
+
+Para evaluar la capacidad discriminante del modelo se construirá una matriz de confusión, la cual es una tabla cruzada entre los orígenes reales de los automóviles y los orígenes predichos por el modelo de regresión logística multinomial, a continuación se muestra la construcción de esta matriz.
+
+```{r}
+library(nnet)
+predicciones <- predict(multinomial, autos, type="class")
+reales <- autos$origen
+CrossTable(predicciones,reales,prop.chisq=FALSE,prop.c=FALSE,prop.r=FALSE)
+```
+
+Como podemos observar en la matriz de confusión, es una cantidad muy elevada de predicciones acertadas con respecto al origen de Estados Unidos es decir que los automóviles que tengan el perfil de Estados Unidos tienen una probabilidad del $82$% de clasificarse correctamente, después siguen los orígenes de Europa y Japón los cuales también tienen un buen acierto, pero con menor efectividad que en Estados Unidos, pero en general se tiene una capacidad predictiva en el modelo de elección múltiple de aproximadamente el $71$% de efectividad, lo cual significa que se tiene un modelo bien ajustado y se espera que esa capacidad predictiva se aproveche en los casos donde se requiera, por ejemplo alguien que se dedica a la venta de Vehículos pudiera estar muy interesado es predecir el origen, con el fin de cotizar el precio de los vehículos.
+
+\subsubsection{2.2.5. Predicciones}
+
+Uno de los objetivos de los modelos estadísticos es realizar predicciones en virtud del perfil de los objetos que se van a clasificar en un determinado grupo, para este problema, los objetos son los automóviles, y mediante el modelo de elección multiple que se estimó anteriormente se realizarán predicciones para $5$ nuevos registros de automóviles de los cuales se quiere predecir el origen geográfico y cuyos datos de cada uno de estos nuevos automóviles muestran a continuación en el siguiente data frame.
+
+```{r}
+autos<-paste('Auto nuevo',1:5)
+pot<- c(220,71,59,61,108)
+p <- c(1225,856,605,698,905)
+ac <- c(11,14,19,17,16)
+cil <- c('8 cilindros','4 cilindros','4 cilindros','5 cilindros','6 cilindros')
+
+data.frame(autos,Potencia=pot,peso=p,aceleracion=ac,cilindro=cil)
+```
+A continuación se muestra el origen predicho para cada uno de los $5$ nuevos automóviles más resientes de los cuales se tiene registro, y como podemos observar, los automóviles de origen Estadounidense parecen ser los más frecuentes.
+
+```{r}
+AutosNuevos <- data.frame(Potencia=pot,peso=p,aceleracion=ac,cilindro=cil)
+
+prediccion <- predict(multinomial,newdata =AutosNuevos)
+
+OrigenesPredichos<-data.frame(Autos=autos, 'Origen Predicho'=prediccion)
+
+OrigenesPredichos
+```
+
+
+\section{3. Regresión Logística Multinomial en IBM SPSS}
+
+\subsection{3.1. Análisis exploratorio}
+
+En spss no se sustituirán los valores nulos, debido a que spss detecta cuales son los valores nulos que contiene nuestra base de datos y realiza los analisis sin tomarlos en cuenta.
+
+\subsubsection{3.1.1 Análisis descriptivo}
+
+Para poder determinar cuáles variables independientes valen la pena agregar a nuestro modelo de elección múltiple se analizará de manera bi variada la relación entre la variable dependiente (origen) con las variables independientes, mediante tablas de contingencia se analizará la relación entre la variable dependiente (origen) y las variables no métricas (número de cilindros y derivada) y mediante gráficos de cajas se analizará la relación entre las variables independientes métricas (peso, aceleración y potencia) y la variable dependiente origen, y estos gráficos se harán por categorías de la variable origen. A continuación empezaremos analizando la relación entre la variable origen y la variable número de cilindros.
+
+```{=tex}
+\begin{center}
+\includegraphics[width=0.9\textwidth]{spss1.png} 
+\end{center}
+```
+
+Como podemos observar en la tabla anterior, parece ser que los automóviles de 4 cilindros son de los que se tienen cantidades más o menos similares en cada una de las 3 posibles regiones de origen (Estados Unidos, Europa o Japón), y que sí, un automóvil es de 8 cilindros prácticamente es seguro que su origen sea Estados unidos; sin embargo, los automóviles de Estados Unidos parece ser que se distribuyen de manera uniforme en cuanto a los que son de 4 y 6 cilindros. En conclusión, se nota que esta variable puede aportarnos mucha información para el modelo logístico que se desea estimar, por lo que esta variable será incluida como variable explicativa. Ahora se analizará la relación entre la variable origen y la variable derivada (Filtro).
+
+```{=tex}
+\begin{center}
+\includegraphics[width=0.9\textwidth]{spss2.png} 
+\end{center}
+```
+
+Como podemos observar en el resultado anterior, parece ser que los automóviles de origen Europa y Japón son seleccionados prácticamente el 100% mientras que los de origen en Estados unidos son seleccionados aproximadamente el 50% (esto puede restar potencialidad a la capacidad predictiva del modelo), es por esta razón que la variable filtro (derivada) se considera que no vale la pena incluirla en nuestro modelo.
+
+A continuación seguiremos con el análisis de la variable potencia, ya que es una variable métrica, en la cual se analizará que tanto varían las potencias de los automóviles con respecto a los orígenes de los mismos, estas diferencias se muestran en la siguiente figura.
+
+```{=tex}
+\begin{center}
+\includegraphics[width=0.9\textwidth]{spss4.png} 
+\end{center}
+```
+Como podemos observar en la figura anterior, parece ser que las potencias medias de los vehículos con respecto a su origen varían, aunque la mayor diferencia se observa con los automóviles de Estados Unidos, los cuales difieren y varían más con respecto a los de Europa y Japón, que es poco lo que difieren y varían entre ellos, por esta razón se ha decidido tomar en cuenta esta variable como variable explicativa.
+
+Ahora se analizará si vale la pena incluir la variable aceleración como variable explicativa en nuestro modelo de respuesta cualitativa, esto se analizará de la misma manera que con la variable potencia. A continuación se muestra el respectivo gráfico de la aceleración con respecto a su origen.
+
+```{=tex}
+\begin{center}
+\includegraphics[width=0.9\textwidth]{spss3.png} 
+\end{center}
+```
+Como podemos observar en la figura anterior, se observa que la diferencia en la aceleración medio de los automóviles con origen en Europa difiere aproximadamente igual con los de origen en Japón y Estados Unidos, y la diferencia entre la aceleración media es más grande entre Japón y Estados unidos que las anteriormente mencionadas, también cabe mencionar que en Europa es donde se da la aceleración promedio más alta en los automóviles, debido a estas diferencias descritas se decide por tomar en cuenta la variable aceleración para nuestro modelo de respuesta múltiple.
+
+Ahora analizaremos la discriminación del origen con respecto al peso de los vehículos, para realizar este análisis se muestra a continuación, un boxplot del peso de los automóviles con respecto a su origen.
+
+```{=tex}
+\begin{center}
+\includegraphics[width=0.9\textwidth]{spss5.png} 
+\end{center}
+```
+Como podemos observar en la figura anterior, los pesos medios difieren con respecto a su origen, es decir, el origen de los automóviles tiene influencia en su peso, si miramos los gráficos de Estados Unidos y Japón ni siquiera se traslapan, por ello se decide que si vale la pena agregar la variable peso a nuestro modelo de respuesta múltiple.
+
+\subsection{3.2. Estimación del modelo de elección múltiple}
+
+A continuación, se muestra en la siguiente tabla, el resumen del procesamiento de casos para la estimación del modelo de regresión logística multinomial, en el cual se muestra que hay 7 valores perdidos, y SPSS identifica cuales son los valores perdidos y no los toma en cuenta para el análisis, es por eso que acá se decidió no gestionar los valores nulos, y mostraros los casos que hay para cada categoría de las variables no métricas que participarán en el modelo.
+
+```{=tex}
+\begin{center}
+\includegraphics[width=0.9\textwidth]{spss6.png} 
+\end{center}
+```
+
+A continuación, se muestra en el siguiente cuadro el ajuste del modelo de regresión logística multinomial en IBM SPSS, en el cual especificamos que el origen geográfico será nuestra variable dependiente y que las variables potencia, aceleración, peso y número de cilindros (factor) serán las variables independientes o explicativas de nuestro modelo de regresión logística multinomial.
+
+```{=tex}
+\begin{center}
+\includegraphics[width=0.9\textwidth]{spss7.png} 
+\end{center}
+```
+
+\subsubsection{3.2.1 Contraste de hipótesis para el modelo estimado}
+
+A continuación, en el siguiente cuadro se muestra la prueba de razón de máxima verosimilitud para el modelo estimado.
+
+```{=tex}
+\begin{center}
+\includegraphics[width=0.9\textwidth]{spss8.png} 
+\end{center}
+```
+Como podemos observar en el cuadro anterior, el resultado del valor p (sig) es prácticamente cero lo que significa que los coeficientes si están ejerciendo influencia en nuestro modelo para poder predecir el origen geográfico de los automóviles, el valor de la -2 veces la función de máxima verosimilitud con los coeficientes es mucho menor que la que se realizo solo con el termino constante, es decir, hay una drástica diferencia, eso significa que la función de máxima verosimilitud se minimiza cuando se tienen en el modelo las variables explicativas que se han considerado que nos ayudarán para predecir con un menor grado de error el origen geográfico de un determinado automóvil.
+
+A continuación, en el siguiente cuadro, se muestra el contraste de significatividad individual para determinar el peso de cada variable (coeficiente) para determinar un origen predicho a un determinado automóvil.
+
+```{=tex}
+\begin{center}
+\includegraphics[width=0.9\textwidth]{spss9.png} 
+\end{center}
+```
+
+Para la realización de esta prueba se calcula el valor de la deviance ($-2LL$) con y sin el coeficiente, para determinar si tiene influencia significativa en el modelo de elección discreta mediante la diferencia entre las dos estimaciones, y como se puede observar en el cuadro anterior, parece ser que todas las variables explicativas tienen influencia a la hora de calcular la probabilidad de que un automóvil pertenezca a un destino geográfico, excepto la variable aceleración, la cual parece ser que no tiene mucha influencia.
+
+\subsubsection{3.2.2. Interpretación de los coeficientes de regresión}
+
+A continuación, mediante spss se muestra la estimación de los coeficientes de regresión.
+
+```{=tex}
+\begin{center}
+\includegraphics[width=0.9\textwidth]{spss10.png} 
+\end{center}
+```
+
+La tabla anterior muestra para cada variable y para cada nivel de la variable categórica independiente el valor del coeficiente estimado ($\beta$), su error típico, el estadístico de Wald, los p-valores que miden el nivel de significancia de cada coeficiente en el modelo, la razón de las ventajas estimadas y el intervalo de confianza al $95$% para las ventajas estimadas, se muestra en la columna sig que las variables peso potencia y aceleración tienen una fuerte significativa al momento de realizar una predicción de origen geográfico. Evaluación del ajuste del modelo.
+
+\subsubsection{3.2.3. Evaluación del ajuste del modelo}
+
+Para evaluar la bondad de ajuste se han calculado diferentes estadísticos (los cuales tratar de ser una especie de equivalentes al $R^{2}$ que conocemos), los cuales se muestran en la siguiente tabla.
+
+```{=tex}
+\begin{center}
+\includegraphics[width=1.5\textwidth]{spss11.png} 
+\end{center}
+```
+
+Los valores de los Pseudo $R^{2}$ son aceptables, y muestran que los datos se ajustan bien al modelo predictivo, por ejemplo el calculo del Pseudo R^{2} de Mcfadden se calcula como la razón de máxima verosimilitud entre la deviance con la constante y eso ayuda a que se verifique si las variables explicativas realmente tienen influencia al momento de predecir el origen geográfico de un automóvil. Ya que, si la deviance calculada con todos los coeficientes es pequeña, entonces esa razón tenderá a 1 y significará que los datos se ajustan bien al modelo.
+
+\subsubsection{3.2.4. Capacidad discriminante del modelo}  
+
+Ahora se muestra otro muy buen indicador para evaluar la capacidad predictiva de nuestro modelo de elección múltiple, en la siguiente tabla se tiene la matriz de confución, la cual es una tabla de continegencia de los origenes reales y los origenes predichos por el modelo de regresion logistica multinomial.
+
+
+```{=tex}
+\begin{center}
+\includegraphics[width=0.9\textwidth]{spss12.png} 
+\end{center}
+```
+
+Como podemos observar en la tabla de clasificación, el poder clasificativo del modelo de elección discreta es muy bueno, debido a que ha clasificado de manera correcta a prácticamente el $72$% de los mas de $400$ automóviles que se tenían en la muestra para realizar la estimación de este modelo, y la mayor satisfacción que se puede tener es que este poder clasificativo se proyecte a estimaciones futuras que se realicen para determinar el origen geográfico de uno o un conjunto de automóviles.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
